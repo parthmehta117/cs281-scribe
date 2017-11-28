@@ -1,16 +1,19 @@
 \documentclass{article}
 \usepackage[margin=1in]{geometry}
-\usepackage{../common}
-\usepackage{../pagesetup}
+\usepackage{common}
+\usepackage{pagesetup}
 \usepackage{xcolor}
 
 \renewcommand{\v}{\boldsymbol}
-\newcommand{\argmax}{arg\,max}
+%\newcommand{\argmax}{arg, \max}
 \begin{document}
 
 \lecture{5}{September 18}{Sasha Rush}{Demi Guo, Artidoro Pagnoni, Luke Melas-Kyriazi, Florian Berlinger}{Linear Classification}
 
 \subsection{Classification Introduction}
+
+
+
 Last time we saw linear regression. In linear regression we were predicting $y \in \mathbb{R}$, in classification instead we deal with a discrete set, for example $y \in \{ 0,1\}$ or $y\in \{1, \ldots, C\}$. This distinction only matters for this lecture, starting from next class we will generalize the topics and treat them as the same thing.
 
 \smallskip
@@ -66,7 +69,7 @@ where in equation (5.2) we assume conditional independence (the "Na\"ive" assump
 We can then solve for the parameters maximizing the likelihood, which is equivalent to maximizing the $\log$ likelihood.
 \begin{align}
 		\left(\pi_{\on{MLE}}, \mu_{\on{MLE}}\right) &= \underset{(\v \pi,\v \mu)}{\on{argmax}} \sum_n \log p(\v x_n , y_n| \text{param})\\
-		&= \underset{(\v \pi,\v \mu)}{\on{argmax}} \sum_c N_c \log \pi_c + \sum_i\sum_c\sum_{n:y_n=c}\log p(x_{nj}|y_n)\\
+		&= \underset{(\v \pi,\v \mu)}{\on{argmax}} \sum_c N_c \log \pi_c + \sum_i\sum_c\sum_{n:y_n=c}\  p(x_{nj}|y_n)\\
 	    &= \left(\arg\!\max_{(\v \pi,\v \mu)} \sum_c N_c \log \pi_c\right) + \left(\arg\!\max_{(\v \pi,\v \mu)} \sum_i\sum_c\sum_{n:y_n=c}\log p(x_{nj}|y_n)\right)
 \end{align}
 Where $N_c = \sum_n \mathbb{1}(y_n = c)$, and $N =$ the number of data points.
@@ -104,16 +107,35 @@ Now, \textbf{what prior should we use?}
 \end{enumerate} 
 Recall that we want to use conjugate priors to have a natural update (that's why we pair them up!). By using conjugate priors, we will have:
     \[ p(\pi | \text{data}) = Dir(N_1 + \alpha_1, \cdots, N_c + \alpha_c) \]
-    \[ p(\mu_{jc} | \text{data}) = \beta((N_c - N_{jc}) + \beta_0, N_c + \beta_1) \]
+    \[ p(\mu_{jc} | \text{data}) = Beta((N_c - N_{jc}) + \beta_0, N_c + \beta_1) \]
 \subsubsection{Intuition}
 You can think of the $\alpha_i$ above as initial pseudocounts. Those pseudocounts give nonzero probability to features we haven't seen before, which is crucial for NLP. For unseen features, you could have a pseudocount of 1 or 0.5 (Laplace term) or something. 
 
 Because of this property, a Bayesian model helps prevents overfitting by introducing such priors: consider the spam email classification problem mentioned before. Say the word "subject" (call it feature $j$) always occurs in both classes ("spam" and "not spam"), so we estimate $\hat{\theta}_{jc} = 1$ (we overfit!) What will happen if we encounter a new email which does not have this word in it? Our algorithm will crash and burn! This is another manifestation of the black swan paradox discussed in Book Section 3.3.4.1. Note that this will not happen if we introduce pseudocounts to all features! 
 \subsection{Posterior Predictive}
-\[p(\hat{y}, \hat{x} \mid \text{data}) = (\text{integrate over parameters})\] 
+
+\begin{exercise} 
+Find the posterior predictive density of the Bayesian Naive Bayes model. Assume that the following factored prior is used: 
+\[p(\pi, \mu) = p(\pi) \prod_j \prod_c p(\mu_{jc})\] \end{exercise}
+
+
+\begin{proof} 
+\text{The posterior predictive density is given by } 
+\begin{align*}
+   p(y = c \mid  x, \text{data})  &\propto p(y = c \mid \text{data}) \prod_j p(x_j\mid y = c, \text{ data})\\
+\text{On integrating out unknown parameters, } \\
+&= \int \text{Cat}(y = c \mid \pi)p(\pi\mid\text{data} )d\pi \prod_j \int \text{Ber}(x_j = c \mid y,\mu_{jc})p(\mu_{jc}\mid\text{data} )d\mu_{jc}\\
+\text{More succinctly, the density is}  \\
+  &= {\pi_c}^{\on{MAP}}\prod_j ({\mu_{jc}}^{\on{MAP}})^{\mathbb{I} (x_j = 1)}(1-{\mu_{jc}}^{\on{MAP}})^{\mathbb{I} (x_j = 0)} 
+\end{align*}
+
+where
+
 \[ {\pi_c}^{\on{MAP}} = \frac{N_c + \alpha_c}{N + \sum_c \alpha_c} (\text{Dirichlet MAP}) \] 
 \[{\mu_{jc}}^{\on{MAP}} = \frac{N_{jc} + \beta_1}{N_c + \beta_1 + \beta_0} (\text{Beta MAP})\] 
-(How to derive this? Good exercise!)
+
+\end{proof}
+
 \subsection{More on Predictive}
 Now, let's consider a little bit more about what's happening in our predictive. Consider the email spam classification problem: given some features of an email, we want to predict if the email is a spam or not a spam. We have:
 \begin{align*}
@@ -122,7 +144,7 @@ Now, let's consider a little bit more about what's happening in our predictive. 
     &= \exp(\log \pi_c + \sum_j x_j \log \mu_{jc} + (1-x_j) \log(1 - \mu_{jc})) \> (\text{take exp of log})\\
     &= \exp\left(\log \pi_c + \sum_j \log(1-\mu_{jc}) + \sum_j x_j \log\frac{\mu_{jc}}{1-\mu_{jc}}\right)
 \end{align*}
-where the first two term $log \pi_c + \sum_j log(1-\mu_{jc})$ is a constant (we call it $b$ for bias), and the last term $\sum_j x_j log\frac{\mu_{jc}}{1-\mu_{jc}}$ is linear (we call it $\theta$).
+where the first two term $\log \pi_c + \sum_j \log(1-\mu_{jc})$ is a constant (we call it $b$ for bias), and the last term $\sum_j x_j \log\frac{\mu_{jc}}{1-\mu_{jc}}$ is linear (we call it $\theta$).
 \subsection{Multivariate Bernoulli Naive Bayes}
 For Multivariate Bernoulli NB, we will have:
 \begin{align*}
@@ -144,7 +166,7 @@ $$ \theta = \log \frac{\mu}{1-\mu} \implies \mu = \frac{e^{\theta}}{1 + e^{\thet
 We denote this function $\sigma(\theta)$ as the sigmoid function. The sigmoid function is a map from the real line to the interval $[0,1]$, so is useful as a representation of probability. It is also a common building block in constructing neural networks, as we will see later in the course. 
 \begin{figure}
 \centering
-\includegraphics[width=0.5\textwidth]{./sigmoid.png}
+\includegraphics[width=0.5\textwidth]{sigmoid.png}
 \caption{The Sigmoid Function}
 \end{figure}
 \subsection{The Softmax Function}
@@ -159,12 +181,21 @@ In practice, this summation is often computationally expensive. However, it is n
 We call the resulting probability density function the \emph{softmax}: 
 $$ \text{softmax}(z)_i = \frac{ \exp(z_i) }{ \sum_{i'} \exp(z_{i'})} $$
 This function generalizes the sigmoid function to multiple classes/dimensions. 
-\begin{figure}
+\begin{figure}[h]
 \centering
-\includegraphics[width=0.5\textwidth]{./softmax.png}
-\caption{The Softmax Function}
+\includegraphics[width=0.5\textwidth]{softmax.png}
+\caption{An example of the Softmax in action: higher probabilities assigned to higher weights.}
 \end{figure}
 We call it the "softmax" because we may think of it as a smooth, differentiable version of the function which simply returns $1$ for the most likely class (or argmax). 
+
+Often, when computing the log-likelihood for instance, the log of the normalization constant $$ \log(Z(\theta)) = \log \sum_{c'} \exp(\theta_{c'}^T x + b_{c'}) $$ becomes a cause of much upset: it leads to wrong answers due to overflow and underflow. Intuitively, flows occur due to the very nature of the exponential function. Thus, while $e^{\v x} \approx [e, 7.39, 20.09] $, for $\v x =  \ [1,2,3] $, a typical program will return $e^{\v x} \approx  [0, inf, inf] $, for $\v x = \ [-1000,1000,2000] $. As one might guess, the $inf$'s are caused due to a stack overflow. 
+\newline The log-sum-exp trick comes to the rescue.  Recall the basic property that
+
+\begin{align*} \log\sum_{n=1}^N\exp\{x_n\} &= a + \log\sum_{n=1}^N\exp\{x_n-a\}, \forall a \in \R.
+\end{align*}
+
+so it is indeed worthwhile to subtract a constant from each weight $x$, calculate the exponential without worry, take the $\log$ of the resultant sum, and then add back the constant. Note that there is no rule that defines a particular value for $a$; it should nevertheless be something sensible such as $a = \max_n x_n$.
+
 \subsection{Discriminative Classification}
 We may apply the mathematical tools developed in the generative classification setting discussed above to perform discriminative classification. In discriminative classification, we assume that our inputs $x$ are fixed, rather than coming from some probability distribution.
 
@@ -183,6 +214,85 @@ This model is known as \textbf{logistic regression} (even though it is used for 
     \item Convex Optimization by Lieven Vandenberghe and Stephen P. Boyd
 \end{itemize}
 
+\begin{exercise} 
+Write code for a logistic regression model to classify images from the modified NIST (mnist) dataset found here: \href{http://deeplearning.net/tutorial/gettingstarted.html}{mnist}.
+
+\end{exercise}
+
+\begin{lstlisting}[language=Python, caption=Solution for Exercise 5.2]
+import numpy as np
+
+import torch
+from torch.autograd import Variable
+from torch import optim
+
+from data_util import load_mnist
+
+
+def build_model(input_dim, output_dim):
+    # We don't need the softmax layer here since CrossEntropyLoss already
+    # uses it internally.
+    model = torch.nn.Sequential()
+    model.add_module("linear",
+                     torch.nn.Linear(input_dim, output_dim, bias=False))
+    return model
+
+
+def train(model, loss, optimizer, x_val, y_val):
+    x = Variable(x_val, requires_grad=False)
+    y = Variable(y_val, requires_grad=False)
+
+    # Reset gradient
+    optimizer.zero_grad()
+
+    # Forward
+    fx = model.forward(x)
+    output = loss.forward(fx, y)
+
+    # Backward
+    output.backward()
+
+    # Update parameters
+    optimizer.step()
+
+    return output.data[0]
+
+
+def predict(model, x_val):
+    x = Variable(x_val, requires_grad=False)
+    output = model.forward(x)
+    return output.data.numpy().argmax(axis=1)
+
+
+def main():
+    torch.manual_seed(42)
+    trX, teX, trY, teY = load_mnist(onehot=False)
+    trX = torch.from_numpy(trX).float()
+    teX = torch.from_numpy(teX).float()
+    trY = torch.from_numpy(trY).long()
+
+    n_examples, n_features = trX.size()
+    n_classes = 10
+    model = build_model(n_features, n_classes)
+    loss = torch.nn.CrossEntropyLoss(size_average=True)
+    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    batch_size = 100
+
+    for i in range(100):
+        cost = 0.
+        num_batches = n_examples // batch_size
+        for k in range(num_batches):
+            start, end = k * batch_size, (k + 1) * batch_size
+            cost += train(model, loss, optimizer,
+                          trX[start:end], trY[start:end])
+        predY = predict(model, teX)
+        print("Epoch %d, cost = %f, acc = %.2f%%"
+              % (i + 1, cost / num_batches, 100. * np.mean(predY == teY)))
+
+
+if __name__ == "__main__":
+    main()
+\end{lstlisting}
 \end{document}
 
 
